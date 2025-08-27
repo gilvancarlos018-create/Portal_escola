@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema Escolar</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-blue-50 min-h-screen flex flex-col">
+
+  <!-- Tela de login -->
+  <section id="loginSection" class="flex-grow flex flex-col items-center justify-center p-6">
+    <h1 class="text-4xl font-bold text-blue-700 mb-6">Sistema Escolar</h1>
+    <form id="loginForm" class="grid gap-4 w-full max-w-sm bg-white p-6 rounded shadow">
+      <input type="text" id="loginUser" placeholder="Usuário ou Nome do Aluno" class="p-2 border rounded" required />
+      <input type="password" id="loginPass" placeholder="Senha" class="p-2 border rounded" required />
+      <button type="submit" class="bg-blue-600 text-white py-2 rounded">Entrar</button>
+    </form>
+  </section>
+
+  <!-- Painel Gestão -->
+  <section id="gestaoPanel" class="hidden p-6">
+    <h2 class="text-2xl font-bold text-blue-700 mb-4">Painel da Gestão</h2>
+    <form id="gestaoForm" class="grid gap-4 bg-white p-4 rounded shadow">
+      <input type="text" id="gestaoNome" placeholder="Nome do aluno" class="p-2 border rounded" required />
+      <input type="date" id="gestaoNascimento" class="p-2 border rounded" required />
+      <input type="file" id="gestaoFoto" accept="image/*" class="p-2 border rounded" required />
+      <input type="password" id="gestaoSenha" placeholder="Senha do aluno" class="p-2 border rounded" required />
+      <button type="submit" class="bg-green-500 text-white py-2 rounded">Cadastrar</button>
+    </form>
+    <h3 class="text-xl font-semibold mt-6 text-blue-600">Alunos Cadastrados</h3>
+    <div id="gestaoAlunos" class="grid gap-4 mt-2"></div>
+    <button onclick="logout()" class="mt-4 bg-red-500 text-white py-2 px-4 rounded">Sair</button>
+  </section>
+
+  <!-- Painel Professor -->
+  <section id="professorPanel" class="hidden p-6">
+    <h2 class="text-2xl font-bold text-blue-700 mb-4">Painel do Professor</h2>
+    <table class="w-full border bg-white rounded shadow">
+      <thead class="bg-blue-200">
+        <tr>
+          <th class="border p-2">Aluno</th>
+          <th class="border p-2">Matéria</th>
+          <th class="border p-2">Nota</th>
+        </tr>
+      </thead>
+      <tbody id="tbodyProfessor"></tbody>
+    </table>
+    <button onclick="logout()" class="mt-4 bg-red-500 text-white py-2 px-4 rounded">Sair</button>
+  </section>
+
+  <!-- Painel Aluno -->
+  <section id="alunoPanel" class="hidden p-6">
+    <h2 class="text-2xl font-bold text-blue-700 mb-4">Meu Boletim</h2>
+    <div id="alunoContent" class="bg-white p-4 rounded shadow"></div>
+    <button onclick="logout()" class="mt-4 bg-red-500 text-white py-2 px-4 rounded">Sair</button>
+  </section>
+
+  <script>
+    const materias = [
+      "Língua Portuguesa", "Matemática", "Língua Inglesa", "Arte",
+      "Educação Física", "Biologia", "Química", "Física",
+      "História", "Geografia", "Filosofia", "Sociologia"
+    ];
+
+    let alunoAtual = null;
+
+    // --- Login ---
+    document.getElementById("loginForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const user = document.getElementById("loginUser").value.trim();
+      const pass = document.getElementById("loginPass").value.trim();
+
+      if (user === "gestao" && pass === "123") {
+        abrirPainel("gestaoPanel");
+        renderGestao();
+      } else if (user === "professor" && pass === "123") {
+        abrirPainel("professorPanel");
+        renderProfessor();
+      } else {
+        // tenta como aluno
+        const alunos = JSON.parse(localStorage.getItem("alunosInfo") || "[]");
+        const aluno = alunos.find(a => a.nome === user && a.senha === pass);
+        if (aluno) {
+          alunoAtual = aluno;
+          abrirPainel("alunoPanel");
+          renderAluno();
+        } else {
+          alert("Usuário ou senha incorretos!");
+        }
+      }
+    });
+
+    function abrirPainel(id) {
+      document.getElementById("loginSection").classList.add("hidden");
+      document.getElementById("gestaoPanel").classList.add("hidden");
+      document.getElementById("professorPanel").classList.add("hidden");
+      document.getElementById("alunoPanel").classList.add("hidden");
+      document.getElementById(id).classList.remove("hidden");
+    }
+
+    function logout() {
+      document.getElementById("loginSection").classList.remove("hidden");
+      document.getElementById("gestaoPanel").classList.add("hidden");
+      document.getElementById("professorPanel").classList.add("hidden");
+      document.getElementById("alunoPanel").classList.add("hidden");
+    }
+
+    // --- Cadastro Gestão ---
+    document.getElementById("gestaoForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const nome = document.getElementById("gestaoNome").value;
+      const nascimento = document.getElementById("gestaoNascimento").value;
+      const senha = document.getElementById("gestaoSenha").value;
+      const file = document.getElementById("gestaoFoto").files[0];
+
+      if (!file) { alert("Selecione uma foto!"); return; }
+
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        const fotoBase64 = ev.target.result;
+        let alunos = JSON.parse(localStorage.getItem("alunosInfo") || "[]");
+
+        const notasMaterias = {};
+        materias.forEach(m => notasMaterias[m] = null);
+
+        alunos.push({nome, nascimento, senha, foto: fotoBase64, notas: notasMaterias, faltas: 0});
+        localStorage.setItem("alunosInfo", JSON.stringify(alunos));
+        renderGestao();
+        alert("Aluno cadastrado com sucesso!");
+        document.getElementById("gestaoForm").reset();
+      };
+      reader.readAsDataURL(file);
+    });
+
+    function renderGestao() {
+      const alunos = JSON.parse(localStorage.getItem("alunosInfo") || "[]");
+      const container = document.getElementById("gestaoAlunos");
+      container.innerHTML = "";
+      alunos.forEach((a, idx) => {
+        container.innerHTML += `
+          <div class="flex items-center justify-between bg-blue-100 p-2 rounded">
+            <div class="flex items-center gap-4">
+              <img src="${a.foto}" class="w-16 h-16 rounded-full object-cover border-2 border-blue-400" />
+              <div>
+                <p class="font-bold">${a.nome}</p>
+                <p class="text-sm">Nascimento: ${a.nascimento}</p>
+                <p class="text-sm">Senha: ${a.senha}</p>
+              </div>
+            </div>
+            <button onclick="removerAluno(${idx})" class="bg-red-500 text-white px-2 py-1 rounded text-sm">Apagar</button>
+          </div>`;
+      });
+    }
+
+    function removerAluno(idx) {
+      if (confirm("Tem certeza que deseja apagar este aluno?")) {
+        let alunos = JSON.parse(localStorage.getItem("alunosInfo") || "[]");
+        alunos.splice(idx, 1);
+        localStorage.setItem("alunosInfo", JSON.stringify(alunos));
+        renderGestao();
+        renderProfessor();
+      }
+    }
+
+    // --- Painel Professor ---
+    function renderProfessor() {
+      const alunos = JSON.parse(localStorage.getItem("alunosInfo") || "[]");
+      const tbody = document.getElementById("tbodyProfessor");
+      tbody.innerHTML = "";
+
+      alunos.forEach((a, idx) => {
+        materias.forEach(m => {
+          tbody.innerHTML += `
+            <tr>
+              <td class="border p-2">${a.nome}</td>
+              <td class="border p-2">${m}</td>
+              <td class="border p-2">
+                <input type="number" min="0" max="10" step="0.5"
+                  data-idx="${idx}" data-materia="${m}"
+                  class="w-20 p-1 border rounded"
+                  value="${a.notas[m] !== null ? a.notas[m] : ""}">
+              </td>
+            </tr>`;
+        });
+        tbody.innerHTML += `
+          <tr class="bg-blue-50">
+            <td colspan="2" class="border p-2"><strong>Faltas de ${a.nome}</strong></td>
+            <td class="border p-2">
+              <input type="number" min="0" data-idx="${idx}" data-faltas="true"
+                class="w-20 p-1 border rounded"
+                value="${a.faltas || 0}">
+            </td>
+          </tr>`;
+      });
+
+      tbody.querySelectorAll("input").forEach(input => {
+        input.addEventListener("change", (e) => {
+          let alunos = JSON.parse(localStorage.getItem("alunosInfo") || "[]");
+          const idx = e.target.dataset.idx;
+          if (e.target.dataset.faltas) {
+            alunos[idx].faltas = parseInt(e.target.value);
+          } else {
+            const materia = e.target.dataset.materia;
+            alunos[idx].notas[materia] = parseFloat(e.target.value);
+          }
+          localStorage.setItem("alunosInfo", JSON.stringify(alunos));
+        });
+      });
+    }
+
+    // --- Painel Aluno ---
+    function renderAluno() {
+      if (!alunoAtual) return;
+      const content = document.getElementById("alunoContent");
+
+      let soma = 0, count = 0;
+      let notasHtml = "<table class='w-full border mt-2'><tr class='bg-blue-200'><th>Matéria</th><th>Nota</th></tr>";
+      for (let m of materias) {
+        const nota = alunoAtual.notas[m];
+        notasHtml += `<tr><td class="border p-1">${m}</td><td class="border p-1">${nota ?? "-"}</td></tr>`;
+        if (nota !== null) { soma += nota; count++; }
+      }
+      notasHtml += "</table>";
+
+      const media = count > 0 ? (soma / count).toFixed(2) : "-";
+
+      let situacao = "Sem notas";
+      if (count > 0) {
+        let algumaAbaixo4 = false;
+        let algumaAbaixo6 = false;
+        
+        for (let m of materias) {
+          const nota = alunoAtual.notas[m];
+          if (nota !== null) {
+            if (nota < 4) algumaAbaixo4 = true;
+            else if (nota < 6) algumaAbaixo6 = true;
+          }
+        }
+
+        if (alunoAtual.faltas > 72) {
+          situacao = "Reprovado (faltas)";
+        } else if (algumaAbaixo4) {
+          situacao = "Reprovado";
+        } else if (algumaAbaixo6) {
+          situacao = "Recuperação";
+        } else {
+          situacao = "Aprovado";
+        }
+      }
+
+      content.innerHTML = `
+        <div class="flex items-center gap-4 mb-4">
+          <img src="${alunoAtual.foto}" class="w-20 h-20 rounded-full object-cover border-2 border-blue-500" />
+          <div>
+            <p class="font-bold text-blue-900">${alunoAtual.nome}</p>
+            <p class="text-sm text-gray-600">Nascimento: ${alunoAtual.nascimento}</p>
+          </div>
+        </div>
+        ${notasHtml}
+        <p class="mt-2"><strong>Média:</strong> ${media}</p>
+        <p><strong>Faltas:</strong> ${alunoAtual.faltas}</p>
+        <p><strong>Situação:</strong> ${situacao}</p>
+      `;
+    }
+  </script>
+</body>
+</html>
+
